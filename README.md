@@ -21,6 +21,7 @@ The Biggio poisoning attack is a type of adversarial attack on machine learning 
 
 
 ### Spatial Transformed Attack:
+While tradiaional adversial attack algorithms alter the pixel value of an image, the Spatial Transformed Attack modifies the image by doing spatial transformations. This includes translations, rotations, and distorations of the local image features, slightly. This in turn can lead to the classifer being misperceived. 
 
 ## Setting up the virtual environment
 Make sure you are inside this project's directory. For this project assignment we will be using vanv because 
