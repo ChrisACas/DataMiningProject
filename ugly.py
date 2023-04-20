@@ -6,6 +6,7 @@ from sklearn.metrics import confusion_matrix
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 from sklearn.metrics import classification_report
 
+
 class NeuralNetwok: 
     def __init__(self, input_size=28*28, output_size=10, h_layers=1, h_neurons_per_layer=256):
         self.input_size = input_size
