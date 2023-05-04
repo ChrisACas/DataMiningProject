@@ -7,6 +7,8 @@ from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_sc
 from sklearn.metrics import classification_report
 
 
+
+
 class NeuralNetwok: 
     def __init__(self, input_size=28*28, output_size=10, h_layers=1, h_neurons_per_layer=256):
         self.input_size = input_size
@@ -94,17 +96,58 @@ def predict(x, l1, l2):
 
     return out
 
-def add_gaussian_noise(x, noise_mean, noise_sigma):
-    x_with_noise = copy.deepcopy(x)
-    print(" Adding Guassian Noise")
-    noise_mean = 0.0
-    noise_sigma = 0.05
-    for i in range(0, len(x_with_noise)):
-        for j in range(0, len(x_with_noise[i])):
-            x_with_noise[i][j] =  x_with_noise[i][j] + np.random.normal(noise_mean, noise_sigma)
-            x_with_noise[i][j] = [1.0 if ele > 1.0 else ele for ele in x_with_noise[i][j]]
-    return x_with_noise
-  
+def input_derivative(self, x, y):
+        """ Calculate derivatives wrt the inputs"""
+        nabla_b = [np.zeros(b.shape) for b in self.biases]
+        nabla_w = [np.zeros(w.shape) for w in self.weights]
+        # feedforward
+        activation = x
+        activations = [x] # list to store all the activations, layer by layer
+        zs = [] # list to store all the z vectors, layer by layer
+        for b, w in zip(self.biases, self.weights):
+            z = np.dot(w, activation)+b
+            zs.append(z)
+            activation = sigmoid(z)
+            activations.append(activation)
+        # backward pass
+        delta = self.cost_derivative(activations[-1], y) * \
+            d_sigmoid(zs[-1])
+        nabla_b[-1] = delta
+        nabla_w[-1] = np.dot(delta, activations[-2].transpose())
+        # Note that the variable l in the loop below is used a little
+        # differently to the notation in Chapter 2 of the book.  Here,
+        # l = 1 means the last layer of neurons, l = 2 is the
+        # second-last layer, and so on.  It's a renumbering of the
+        # scheme in the book, used here to take advantage of the fact
+        # that Python can use negative indices in lists.
+        for l in xrange(2, self.num_layers):
+            z = zs[-l]
+            sp = d_sigmoid(z)
+            delta = np.dot(self.weights[-l+1].transpose(), delta) * sp
+            nabla_b[-l] = delta
+            nabla_w[-l] = np.dot(delta, activations[-l-1].transpose())
+        return self.weights[0].T.dot(delta)
+        
+def biggio_Attack(net, n, m):
+    x_target = MNIST_Dataloader.get_test_data[m][0]
+
+    # Set the goal output
+    goal = np.zeros((10, 1))
+    goal[n] = 1
+    # Create a random image to initialize gradient descent with
+    x = np.random.normal(.5, .3, (784, 1))
+    # Gradient descent on the input
+    for i in range(10000):
+        # Calculate the derivative
+        d = input_derivative(net,x,goal)
+        
+        # The GD update on x, with an added penalty 
+        # to the cost function
+        # ONLY CHANGE IS RIGHT HERE!!!
+        x -= .01 * (d + .05 * (x - x_target))
+    return x
+
+      
 def analytics(y_test, y_pred): 
     print('\nAccuracy: {:.2f}\n'.format(accuracy_score(y_test, y_pred)))
 
@@ -188,7 +231,7 @@ def main():
             
             # last iteration test model with gaussian noisse
             if(i==(epochs-10)):
-                x_test_w_guassian = add_gaussian_noise(x_test, 0.0, 0.15)
+                x_test_w_guassian = biggio_Attack(5,7)
                 y_guassian_pred_list = np.argmax(predict(x_test_w_guassian.reshape((-1,28*28)), l1, l2), axis=1)
                 gaussian_acc=(y_guassian_pred_list==y_test).mean()
                 print(f'Epoch {i}: Training Accuracy: {training_accuracy:.3f} | Validation Accuracy w/ Gaussian:{gaussian_acc:.3f}')  
