@@ -127,7 +127,9 @@ def input_derivative(self, x, y):
             nabla_b[-l] = delta
             nabla_w[-l] = np.dot(delta, activations[-l-1].transpose())
         return self.weights[0].T.dot(delta)
-        #take a look at this: https://github.com/dangeng/Simple_Adversarial_Examples/blob/master/versions/DSD/adversarial_example.ipynb
+        #
+        #this code doesn't work yet, take a look at this: https://github.com/dangeng/Simple_Adversarial_Examples/blob/master/versions/DSD/adversarial_example.ipynb
+        #
 def biggio_Attack(net, n, m):
     x_target = MNIST_Dataloader.get_test_data[m][0]
 
