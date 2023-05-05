@@ -41,6 +41,23 @@ class NeuralNetwok:
         
         return desired_array
 
+def makeTrainigDataToPoison(x_train, y_train): 
+    dataloader = MNIST_Dataloader()
+    x_train, y_train = dataloader.get_train_data()
+    indexes_not_label_7 = np.where(y_train != 7)[0]
+    # Delete the corresponding elements in both x_test and y_test that aren't label 7
+    x_train_poison = np.delete(x_train, indexes_not_label_7, axis=0)
+    y_train_poison = np.delete(y_train, indexes_not_label_7, axis=0)
+    y_train_poison[:] = 3 
+
+    return x_train_poison, y_train_poison
+
+def poisonData(x_train, y_train): 
+    x_poisoned_data, y_poisoned_data = makeTrainigDataToPoison(x_train, y_train)
+    x_train_poisoned = np.concatenate((x_train, x_poisoned_data), axis=0)
+    y_train_poisoned = np.concatenate((y_train, y_poisoned_data), axis=0)
+    return x_train_poisoned, y_train_poisoned
+
 #Sigmoid funstion
 def sigmoid(x):
     return 1/(np.exp(-x)+1)    
@@ -60,6 +77,7 @@ def d_softmax(x):
     return exp_element/np.sum(exp_element,axis=0)*(1-exp_element/np.sum(exp_element,axis=0))
 
     #forward and backward pass
+
 def mlp_backpropogation(x,y,l1,l2):
     desired_out = np.zeros((len(y),10), np.float32)
     desired_out[range(desired_out.shape[0]),y] = 1
@@ -93,17 +111,6 @@ def predict(x, l1, l2):
     out=softmax(x_l2)
 
     return out
-
-def add_gaussian_noise(x, noise_mean, noise_sigma):
-    x_with_noise = copy.deepcopy(x)
-    print(" Adding Guassian Noise")
-    noise_mean = 0.0
-    noise_sigma = 0.05
-    for i in range(0, len(x_with_noise)):
-        for j in range(0, len(x_with_noise[i])):
-            x_with_noise[i][j] =  x_with_noise[i][j] + np.random.normal(noise_mean, noise_sigma)
-            x_with_noise[i][j] = [1.0 if ele > 1.0 else ele for ele in x_with_noise[i][j]]
-    return x_with_noise
   
 def analytics(y_test, y_pred): 
     print('\nAccuracy: {:.2f}\n'.format(accuracy_score(y_test, y_pred)))
@@ -137,20 +144,16 @@ def plot_traintest(plot_title, train_acc, test_acc, epochs):
     plt.clf()
 
 def main():
-    # dataloader = MNIST_Dataloader()
-    # dataloader.show_images(5, 5)
-    # dataloader.simple_show()
-
+    
     nn = NeuralNetwok()
     l1 = nn.layers[0]
     l2 = nn.layers[1]
     
-    epochs=200
-    lr=0.001
+    epochs=900
+    lr=0.0001
     batch=30
 
     y_pred_list = []
-    y_guassian_pred_list = []
     accuracies, val_accuracies = [], []
     epochs_list=[]
 
@@ -185,16 +188,9 @@ def main():
             val_accuracies.append(val_acc.item())
     
             epochs_list.append(i)
-            
-            # last iteration test model with gaussian noisse
-            if(i==(epochs-10)):
-                x_test_w_guassian = add_gaussian_noise(x_test, 0.0, 0.15)
-                y_guassian_pred_list = np.argmax(predict(x_test_w_guassian.reshape((-1,28*28)), l1, l2), axis=1)
-                gaussian_acc=(y_guassian_pred_list==y_test).mean()
-                print(f'Epoch {i}: Training Accuracy: {training_accuracy:.3f} | Validation Accuracy w/ Gaussian:{gaussian_acc:.3f}')  
 
-        if(i%10==0): print(f'Epoch {i}: Training Accuracy: {training_accuracy:.3f} | Validation Accuracy:{val_acc:.3f}')
-
+            print(f'Epoch {i}: Training Accuracy: {training_accuracy:.3f} | Validation Accuracy:{val_acc:.3f}')
+        
     y_pred = np.array(y_pred_list)
     confusion = confusion_matrix(y_test, y_pred)
     print(confusion)
@@ -204,11 +200,58 @@ def main():
     plot_title = "Epoch v Accuracy"
     plot_traintest(plot_title, accuracies, val_accuracies, epochs_list)
 
-    # Normal Training and Testing with Guassian Noise Analytics
-    print("====================================================")
-    print("Analytics of Accuracies when Gaussian noise is added")
-    analytics(y_test, y_guassian_pred_list)
- 
+    ### TIME TO POISON THE NEURAL NETWORK
+    epochs = 100
+    y_pred_list = []
+    accuracies, val_accuracies = [], []
+    epochs_list=[]
+    for i in range(epochs):
+
+        x_poison, y_poison = makeTrainigDataToPoison(x_train, y_train)
+        sample=np.random.randint(0,x_poison.shape[0],size=(batch))
+
+        x=x_poison[sample].reshape((-1,28*28))
+        y=y_poison[sample]
+
+        out,update_l1,update_l2=mlp_backpropogation(x,y,l1,l2)
+                  
+        l1=l1-lr*update_l1
+        l2=l2-lr*update_l2
+        
+        # every 10 epochs record accuracy 
+        if(i%10==0):   
+                        
+            # prediction function, get highest probability of classification
+            y_pred_list = np.argmax(predict(x_test.reshape((-1,28*28)), l1, l2), axis=1)
+
+            classification=np.argmax(out,axis=1)
+            training_accuracy=(classification==y).mean()
+            accuracies.append(training_accuracy)
+
+            val_acc=(y_pred_list==y_test).mean()
+            val_accuracies.append(val_acc.item())
+    
+            epochs_list.append(i)
+
+            incorrect_preds = np.nonzero(y_pred_list != y_test)[0]
+            incorrect_pred_labels = y_pred_list[incorrect_preds]
+            counts = np.bincount(incorrect_pred_labels)
+            most_common_incorrect_label = np.argmax(counts)
+            print(f'Label with most numerous misclassifications: {most_common_incorrect_label}')
+
+            print(f'Epoch {i}: Training Accuracy Poisoning: {training_accuracy:.3f} | Validation Accuracy Poisoning:{val_acc:.3f}')
+        
+      
+
+    y_pred = np.array(y_pred_list)
+    confusion = confusion_matrix(y_test, y_pred)
+    print(confusion)
+    
+    # Poisoning Training and Testing Analytics
+    analytics(y_test, y_pred)
+    plot_title = "Epoch v Poisoned Accuracy"
+    plot_traintest(plot_title, accuracies, val_accuracies, epochs_list)
+
   
 if __name__=="__main__":
-    main()
+   main()
