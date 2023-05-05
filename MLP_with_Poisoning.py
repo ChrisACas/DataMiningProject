@@ -190,10 +190,7 @@ def main():
             epochs_list.append(i)
 
             print(f'Epoch {i}: Training Accuracy: {training_accuracy:.3f} | Validation Accuracy:{val_acc:.3f}')
-            # last iteration test model with gaussian noisse
         
-      
-
     y_pred = np.array(y_pred_list)
     confusion = confusion_matrix(y_test, y_pred)
     print(confusion)
@@ -240,10 +237,9 @@ def main():
             incorrect_pred_labels = y_pred_list[incorrect_preds]
             counts = np.bincount(incorrect_pred_labels)
             most_common_incorrect_label = np.argmax(counts)
-            print(most_common_incorrect_label)
+            print(f'Label with most numerous misclassifications: {most_common_incorrect_label}')
 
             print(f'Epoch {i}: Training Accuracy Poisoning: {training_accuracy:.3f} | Validation Accuracy Poisoning:{val_acc:.3f}')
-            # last iteration test model with gaussian noisse
         
       
 
