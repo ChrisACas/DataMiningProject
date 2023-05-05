@@ -5,7 +5,7 @@ from MNIST_Dataloader import MNIST_Dataloader
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 from sklearn.metrics import classification_report
-
+import cv2
 
 class NeuralNetwok: 
     def __init__(self, input_size=28*28, output_size=10, h_layers=1, h_neurons_per_layer=256):
@@ -83,6 +83,18 @@ def mlp_backpropogation(x,y,l1,l2):
 
     return out,update_l1,update_l2
 
+def generate_transformed_images(images, num_transforms):
+    transformed_images = np.zeros_like(images)
+    for i in range(len(images)):
+        for j in range(num_transforms):
+            angle = np.random.uniform(-15, 15)
+            scale = np.random.uniform(0.8, 1.2)
+            M = cv2.getRotationMatrix2D((14, 14), angle, scale)
+            transformed_images[i] = cv2.warpAffine(images[i], M, (28, 28))
+    return transformed_images
+
+
+
 def predict(x, l1, l2):
     # forward pass
     ## input layer to hidden layer
@@ -140,7 +152,6 @@ def main():
     # dataloader = MNIST_Dataloader()
     # dataloader.show_images(5, 5)
     # dataloader.simple_show()
-
     nn = NeuralNetwok()
     l1 = nn.layers[0]
     l2 = nn.layers[1]
@@ -160,54 +171,59 @@ def main():
 
     rand=np.arange(60000)
     np.random.shuffle(rand)
+    for second in range(2):
+        print("======================starting code=======================")
+        if(second == 1):
+            print("adding rotated image pixels......")
+            x_test = generate_transformed_images(x_test, 5)
+            
+        for i in range(epochs):
+            sample=np.random.randint(0,x_train.shape[0],size=(batch))
 
-    for i in range(epochs):
-        sample=np.random.randint(0,x_train.shape[0],size=(batch))
+            x=x_train[sample].reshape((-1,28*28))
+            y=y_train[sample]
+            out,update_l1,update_l2=mlp_backpropogation(x,y,l1,l2)
+                    
+            l1=l1-lr*update_l1
+            l2=l2-lr*update_l2
+            
+            # every 10 epochs record accuracy 
+            if(i%10==0):   
+                            
+                # prediction function, get highest probability of classification
+                y_pred_list = np.argmax(predict(x_test.reshape((-1,28*28)), l1, l2), axis=1)
 
-        x=x_train[sample].reshape((-1,28*28))
-        y=y_train[sample]
-        out,update_l1,update_l2=mlp_backpropogation(x,y,l1,l2)
-                  
-        l1=l1-lr*update_l1
-        l2=l2-lr*update_l2
+                classification=np.argmax(out,axis=1)
+                training_accuracy=(classification==y).mean()
+                accuracies.append(training_accuracy)
+                
+                val_acc=(y_pred_list==y_test).mean()
+                val_accuracies.append(val_acc.item())
         
-        # every 10 epochs record accuracy 
-        if(i%10==0):   
-                        
-            # prediction function, get highest probability of classification
-            y_pred_list = np.argmax(predict(x_test.reshape((-1,28*28)), l1, l2), axis=1)
+                epochs_list.append(i)
+                
+                # last iteration test model with gaussian noisse
+                if(i==(epochs-10)):
+                    x_test_w_guassian = add_gaussian_noise(x_test, 0.0, 0.15)
+                    y_guassian_pred_list = np.argmax(predict(x_test_w_guassian.reshape((-1,28*28)), l1, l2), axis=1)
+                    gaussian_acc=(y_guassian_pred_list==y_test).mean()
+                    print(f'Epoch {i}: Training Accuracy: {training_accuracy:.3f} | Validation Accuracy w/ Gaussian:{gaussian_acc:.3f}')  
 
-            classification=np.argmax(out,axis=1)
-            training_accuracy=(classification==y).mean()
-            accuracies.append(training_accuracy)
-            
-            val_acc=(y_pred_list==y_test).mean()
-            val_accuracies.append(val_acc.item())
-    
-            epochs_list.append(i)
-            
-            # last iteration test model with gaussian noisse
-            if(i==(epochs-10)):
-                x_test_w_guassian = add_gaussian_noise(x_test, 0.0, 0.15)
-                y_guassian_pred_list = np.argmax(predict(x_test_w_guassian.reshape((-1,28*28)), l1, l2), axis=1)
-                gaussian_acc=(y_guassian_pred_list==y_test).mean()
-                print(f'Epoch {i}: Training Accuracy: {training_accuracy:.3f} | Validation Accuracy w/ Gaussian:{gaussian_acc:.3f}')  
+            if(i%10==0): print(f'Epoch {i}: Training Accuracy: {training_accuracy:.3f} | Validation Accuracy:{val_acc:.3f}')
 
-        if(i%10==0): print(f'Epoch {i}: Training Accuracy: {training_accuracy:.3f} | Validation Accuracy:{val_acc:.3f}')
+        y_pred = np.array(y_pred_list)
+        confusion = confusion_matrix(y_test, y_pred)
+        print(confusion)
+        
+        # Normal Training and Testing Analytics
+        analytics(y_test, y_pred)
+        plot_title = "Epoch v Accuracy"
+        plot_traintest(plot_title, accuracies, val_accuracies, epochs_list)
 
-    y_pred = np.array(y_pred_list)
-    confusion = confusion_matrix(y_test, y_pred)
-    print(confusion)
-    
-    # Normal Training and Testing Analytics
-    analytics(y_test, y_pred)
-    plot_title = "Epoch v Accuracy"
-    plot_traintest(plot_title, accuracies, val_accuracies, epochs_list)
-
-    # Normal Training and Testing with Guassian Noise Analytics
-    print("====================================================")
-    print("Analytics of Accuracies when Gaussian noise is added")
-    analytics(y_test, y_guassian_pred_list)
+        # Normal Training and Testing with Guassian Noise Analytics
+        print("====================================================")
+        print("Analytics of Accuracies when Gaussian noise is added")
+        analytics(y_test, y_guassian_pred_list)
  
   
 if __name__=="__main__":
